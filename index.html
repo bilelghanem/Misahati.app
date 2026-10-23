@@ -61,4 +61,4 @@ onAuthStateChanged(auth,async user=>{currentUser=user;$('logoutBtn').classList.t
 $('authStatus').textContent='جارٍ تحميل بيانات حسابك السحابية…';loadingCloud=true;
 try{const ref=doc(db,'users',user.uid),snap=await getDoc(ref);if(snap.exists()&&Array.isArray(snap.data().items)){data=snap.data().items;localStorage.setItem('masahati-items-v1',JSON.stringify(data));$('authStatus').textContent='تم تحميل بياناتك من السحابة بنجاح.'}else{await setDoc(ref,{items:data,updatedAt:Date.now()},{merge:true});$('authStatus').textContent='تم حفظ محتوى هذا الجهاز في حسابك السحابي.'}render()}catch(e){$('authStatus').textContent='تعذر تحميل البيانات السحابية: '+friendlyError(e)}finally{loadingCloud=false}});
 if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js').catch(()=>{}));render();
-</script></body></html></html>
+</script></body></html>
