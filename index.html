@@ -92,8 +92,39 @@ $('items').onchange=e=>{if(e.target.dataset.done){const x=data.find(x=>x.id===e.
 $('theme').onclick=()=>{document.body.classList.toggle('dark');localStorage.setItem('masahati-dark',document.body.classList.contains('dark'))};if(localStorage.getItem('masahati-dark')==='true')document.body.classList.add('dark');
 $('export').onclick=()=>{const blob=new Blob([JSON.stringify({app:'Masahati',version:1,items:data},null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='masahati-backup.json';a.click();URL.revokeObjectURL(a.href)};
 $('importBtn').onclick=()=>$('importFile').click();$('importFile').onchange=async e=>{try{const f=e.target.files[0];if(!f)return;const o=JSON.parse(await f.text());const arr=Array.isArray(o)?o:o.items;if(!Array.isArray(arr))throw Error();if(confirm('سيتم استبدال المحتوى الحالي. هل تريد المتابعة؟')){data=arr;queueCloudSave()}}catch{alert('تعذر قراءة النسخة الاحتياطية.')}e.target.value=''};
-$('enableReminders').onclick=async()=>{if(!('Notification'in window)){alert('المتصفح لا يدعم الإشعارات.');return}const p=await Notification.requestPermission();alert(p==='granted'?'تم تفعيل إشعارات التذكير. يجب أن يبقى التطبيق مفتوحًا لفحص المواعيد.':'لم يتم السماح بالإشعارات. يمكنك تفعيلها من إعدادات المتصفح.')};
-const checkReminders=()=>{if(!('Notification'in window)||Notification.permission!=='granted')return;const now=Date.now();data.forEach(x=>{if(x.due&&!x.done&&new Date(x.due).getTime()<=now){const key='masahati-reminded-'+x.id+'-'+x.due;if(!localStorage.getItem(key)){new Notification('موعد مهمة في مساحتي',{body:x.title||'لديك مهمة حان موعدها'});localStorage.setItem(key,'1')}}})};checkReminders();setInterval(checkReminders,60000);
+async function notifyReminder(item){
+ const title='موعد مهمة في مساحتي';
+ const options={body:item.title||'لديك مهمة حان موعدها',tag:'masahati-'+item.id,icon:'./icon.svg',badge:'./icon.svg',data:{url:'./'}};
+ try{
+  if('serviceWorker'in navigator){
+   const registration=await navigator.serviceWorker.ready;
+   if(registration.showNotification){await registration.showNotification(title,options);return}
+  }
+  new Notification(title,options);
+ }catch(e){showToast('حان موعد: '+(item.title||'مهمة جديدة'),'info')}
+}
+$('enableReminders').onclick=async()=>{
+ if(!('Notification'in window)){showToast('هذا المتصفح لا يدعم إشعارات النظام. يمكنك رؤية المواعيد داخل التطبيق.','error');return}
+ try{
+  const permission=Notification.permission==='default'?await Notification.requestPermission():Notification.permission;
+  if(permission==='granted'){showToast('تم السماح بالإشعارات. أضف موعدًا إلى المهمة لتلقي تذكير عند فتح التطبيق.','success');checkReminders()}
+  else showToast('الإشعارات غير مسموحة. فعّلها من إعدادات الموقع في المتصفح.','info')
+ }catch(e){showToast('تعذر تفعيل الإشعارات في هذا المتصفح.','error')}
+};
+const checkReminders=()=>{
+ if(!('Notification'in window)||Notification.permission!=='granted')return;
+ const now=Date.now();
+ data.forEach(x=>{
+  if(x.task&&x.due&&!x.done&&new Date(x.due).getTime()<=now){
+   const key='masahati-reminded-'+x.id+'-'+x.due;
+   if(!localStorage.getItem(key)){localStorage.setItem(key,'1');notifyReminder(x)}
+  }
+ })
+};
+checkReminders();
+setInterval(checkReminders,30000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkReminders()});
+window.addEventListener('focus',checkReminders);
 $('signupBtn').onclick=async()=>{try{await createUserWithEmailAndPassword(auth,$('authEmail').value.trim(),$('authPassword').value)}catch(e){$('authStatus').textContent=friendlyError(e)}};
 $('loginBtn').onclick=async()=>{try{await signInWithEmailAndPassword(auth,$('authEmail').value.trim(),$('authPassword').value)}catch(e){$('authStatus').textContent=friendlyError(e)}};
 $('resetBtn').onclick=async()=>{try{const email=$('authEmail').value.trim();if(!email){$('authStatus').textContent='اكتب بريدك الإلكتروني أولًا ثم اضغط «نسيت كلمة المرور؟».';return}await sendPasswordResetEmail(auth,email);$('authStatus').textContent='أرسلنا رابط إعادة تعيين كلمة المرور إذا كان البريد مسجلًا.'}catch(e){$('authStatus').textContent=friendlyError(e)}};
