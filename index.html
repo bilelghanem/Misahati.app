@@ -134,13 +134,13 @@ onAuthStateChanged(auth,async user=>{
 let installPromptEvent=null;
 const installButton=$('installApp');
 function isStandalone(){return window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true}
-function updateInstallButton(){if(installButton)installButton.classList.toggle('hidden',isStandalone()||(!installPromptEvent&&!/iphone|ipad|ipod/i.test(navigator.userAgent)))}
+function updateInstallButton(){if(installButton)installButton.classList.toggle('hidden',isStandalone())}
 window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installPromptEvent=event;updateInstallButton()});
 window.addEventListener('appinstalled',()=>{installPromptEvent=null;updateInstallButton();showToast('تم تثبيت مساحتي على جهازك بنجاح.','success')});
 installButton.onclick=async()=>{
  if(installPromptEvent){installPromptEvent.prompt();const choice=await installPromptEvent.userChoice;installPromptEvent=null;updateInstallButton();if(choice.outcome==='accepted')showToast('بدأ تثبيت مساحتي على جهازك.','success');return}
  if(/iphone|ipad|ipod/i.test(navigator.userAgent)){showToast('على iPhone/iPad: اضغط مشاركة في Safari ثم «إضافة إلى الشاشة الرئيسية».','info');return}
- showToast('إذا لم يظهر خيار التثبيت، افتح قائمة المتصفح واختر «تثبيت مساحتي» أو «إضافة إلى الشاشة الرئيسية».','info')
+ showToast('لتثبيت التطبيق: افتح قائمة المتصفح ⋮ ثم اختر «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية». إذا لم يظهر الخيار، افتح الرابط في Chrome أو Edge وحدّث الصفحة.','info')
 };
 updateInstallButton();
 if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js').catch(()=>{}));
