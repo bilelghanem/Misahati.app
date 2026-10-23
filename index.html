@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#6657d9"><meta name="description" content="مساحتي — مساحة عربية للملاحظات والمهام">
+<meta name="theme-color" content="#6657d9"><meta name="description" content="مساحتي — مساحة عربية للملاحظات والمهام"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="apple-mobile-web-app-title" content="مساحتي"><meta name="application-name" content="مساحتي">
 <link rel="manifest" href="./manifest.json"><link rel="icon" href="./icon.svg" type="image/svg+xml">
 <title>مساحتي — Masahati</title>
 <style>
@@ -13,7 +13,7 @@
 .toast{display:flex;align-items:flex-start;gap:10px;padding:13px 15px;border:1px solid #ccefe1;border-radius:15px;background:#f0fff8;color:#145c47;box-shadow:0 12px 35px #17243b22;font-size:13px;font-weight:650;line-height:1.5;animation:toast-in .22s ease-out}
 .toast.error{background:#fff4f3;border-color:#ffd6d2;color:#9a3027}.toast.info{background:#f3f2ff;border-color:#dedbff;color:#4c45a6}.toast-mark{font-size:18px;line-height:1.3}
 @keyframes toast-in{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
-.mobile-nav{display:none}.fab-add{display:none}
+.mobile-nav{display:none}.fab-add{display:none}#installApp{white-space:nowrap}@media(max-width:700px){#installApp{font-size:11px;padding:8px 9px}}
 @media(max-width:700px){
  body{padding-bottom:calc(84px + env(safe-area-inset-bottom))}
  .toast-region{top:12px;left:12px;width:min(350px,calc(100vw - 24px))}
@@ -31,7 +31,7 @@
 </style>
 </head>
 <body><div id="toastRegion" class="toast-region" role="status" aria-live="polite" aria-atomic="false"></div><main class="wrap">
-<header class="head"><div class="brand"><div class="logo">م</div><div><h1>مساحتي</h1><p>Masahati · مساحتك للأفكار والإنجاز</p></div></div><button id="theme" class="secondary" aria-label="تبديل المظهر">◐ المظهر</button></header>
+<header class="head"><div class="brand"><div class="logo">م</div><div><h1>مساحتي</h1><p>Masahati · مساحتك للأفكار والإنجاز</p></div></div><div style="display:flex;gap:8px;align-items:center"><button id="installApp" class="secondary hidden" type="button">⬇ تثبيت التطبيق</button><button id="theme" class="secondary" aria-label="تبديل المظهر">◐ المظهر</button></div></header>
 <section class="hero"><h2>أهلًا بك في مساحتك ✨</h2><p>اجمع أفكارك، رتّب مهامك، وتقدّم خطوة كل يوم.</p></section>
 <section class="panel" id="accountPanel" style="margin-bottom:18px"><h3>☁️ حسابك والمزامنة السحابية</h3><p id="authStatus" style="color:var(--muted);margin-top:0">سجّل الدخول لمزامنة ملاحظاتك ومهامك بين أجهزتك.</p><div id="authForm"><input id="authEmail" class="field" type="email" autocomplete="email" placeholder="البريد الإلكتروني"><input id="authPassword" class="field" type="password" autocomplete="current-password" placeholder="كلمة المرور (6 أحرف على الأقل)"><div style="display:flex;gap:8px;flex-wrap:wrap"><button id="loginBtn" type="button">تسجيل الدخول</button><button id="signupBtn" class="secondary" type="button">إنشاء حساب</button><button id="resetBtn" class="secondary" type="button">نسيت كلمة المرور؟</button><button id="logoutBtn" class="secondary hidden" type="button">تسجيل الخروج</button></div></div><p style="color:var(--muted);font-size:12px;margin-bottom:0">عند أول تسجيل دخول، إذا كان حسابك السحابي فارغًا، سنرفع إليه المحتوى المحفوظ على هذا الجهاز.</p></section>
 <section class="stats"><div class="stat"><strong id="notesCount">0</strong><span>ملاحظة</span></div><div class="stat"><strong id="tasksCount">0</strong><span>مهمة</span></div><div class="stat"><strong id="doneCount">0</strong><span>مهمة مكتملة</span></div></section>
@@ -131,5 +131,18 @@ onAuthStateChanged(auth,async user=>{
   }catch(e){$('authStatus').textContent='تعذر تحميل البيانات السحابية: '+friendlyError(e)}
   finally{loadingCloud=false}
 });
-if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js').catch(()=>{}));render();
+let installPromptEvent=null;
+const installButton=$('installApp');
+function isStandalone(){return window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true}
+function updateInstallButton(){if(installButton)installButton.classList.toggle('hidden',isStandalone()||(!installPromptEvent&&!/iphone|ipad|ipod/i.test(navigator.userAgent)))}
+window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installPromptEvent=event;updateInstallButton()});
+window.addEventListener('appinstalled',()=>{installPromptEvent=null;updateInstallButton();showToast('تم تثبيت مساحتي على جهازك بنجاح.','success')});
+installButton.onclick=async()=>{
+ if(installPromptEvent){installPromptEvent.prompt();const choice=await installPromptEvent.userChoice;installPromptEvent=null;updateInstallButton();if(choice.outcome==='accepted')showToast('بدأ تثبيت مساحتي على جهازك.','success');return}
+ if(/iphone|ipad|ipod/i.test(navigator.userAgent)){showToast('على iPhone/iPad: اضغط مشاركة في Safari ثم «إضافة إلى الشاشة الرئيسية».','info');return}
+ showToast('إذا لم يظهر خيار التثبيت، افتح قائمة المتصفح واختر «تثبيت مساحتي» أو «إضافة إلى الشاشة الرئيسية».','info')
+};
+updateInstallButton();
+if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js').catch(()=>{}));
+render();
 </script></body></html>
