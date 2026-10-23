@@ -26,7 +26,7 @@ body.dark{--bg:#171625;--card:#222034;--ink:#f2efff;--muted:#aaa5c3;--line:#3834
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 const firebaseConfig = {
   apiKey: "AIzaSyDwYz7HbFrGhBtpwe3FdciYy3KHDY1-mdA",
   authDomain: "masahati-app.firebaseapp.com",
@@ -37,12 +37,12 @@ const firebaseConfig = {
 };
 const $=id=>document.getElementById(id);
 const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);
-let data=[];let view='all',editing=null,currentUser=null,loadingCloud=false,saveTimer=null;
+let data=[];let view='all',editing=null,currentUser=null,loadingCloud=false,saveTimer=null,unsubscribeCloud=null,localDirty=false,cloudWriteInProgress=false;
 try{data=JSON.parse(localStorage.getItem('masahati-items-v1')||'[]')}catch{data=[]}
 const esc=s=>String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function reset(){editing=null;$('title').value='';$('bodyText').value='';$('dueDate').value='';$('isTask').checked=false;$('formTitle').textContent='أضف إلى مساحتك';$('save').textContent='حفظ في مساحتي';$('cancel').classList.add('hidden')}
 function render(){const notes=data.filter(x=>!x.task),tasks=data.filter(x=>x.task);$('notesCount').textContent=notes.length;$('tasksCount').textContent=tasks.length;$('doneCount').textContent=tasks.filter(x=>x.done).length;const q=$('search').value.trim().toLowerCase();let rows=data.filter(x=>(view==='all'||view==='notes'&&!x.task||view==='tasks'&&x.task||view==='favorites'&&x.favorite)&&(!q||(x.title+' '+x.body).toLowerCase().includes(q)));$('items').innerHTML=rows.length?rows.map(x=>'<article class="item">'+(x.task?'<input type="checkbox" '+(x.done?'checked':'')+' aria-label="إنجاز المهمة" data-done="'+x.id+'">':'<span style="color:var(--accent)">▤</span>')+'<div class="item-main"><div class="item-title '+(x.done?'done':'')+'">'+esc(x.title||'بدون عنوان')+'</div><small>'+esc(x.body)+'</small><small>'+new Date(x.updated).toLocaleDateString('ar-DZ')+'</small>'+(x.due?'<div class="due">⏰ موعد: '+esc(new Date(x.due).toLocaleString('ar-DZ'))+'</div>':'')+'</div><button class="del" title="المفضلة" data-fav="'+x.id+'">'+(x.favorite?'★':'☆')+'</button><button class="del" title="تعديل" data-edit="'+x.id+'">✎</button><button class="del" title="حذف" data-del="'+x.id+'">×</button></article>').join(''):'<div class="empty">لا يوجد محتوى هنا بعد. ابدأ بإضافة فكرة جميلة ✨</div>'}
-function queueCloudSave(){localStorage.setItem('masahati-items-v1',JSON.stringify(data));render();if(!currentUser||loadingCloud)return;clearTimeout(saveTimer);saveTimer=setTimeout(async()=>{try{await setDoc(doc(db,'users',currentUser.uid),{items:data,updatedAt:Date.now()},{merge:true});$('authStatus').textContent='☁️ تمت مزامنة بياناتك مع هذا الحساب.'}catch(e){$('authStatus').textContent='تعذرت المزامنة الآن: '+friendlyError(e)+' — بياناتك ما زالت محفوظة على هذا الجهاز.'}},500)}
+function queueCloudSave(){localStorage.setItem('masahati-items-v1',JSON.stringify(data));render();if(!currentUser||loadingCloud)return;localDirty=true;clearTimeout(saveTimer);saveTimer=setTimeout(async()=>{if(!currentUser)return;cloudWriteInProgress=true;try{await setDoc(doc(db,'users',currentUser.uid),{items:data,updatedAt:Date.now()},{merge:true});localDirty=false;$('authStatus').textContent='☁️ تمت مزامنة بياناتك مع أجهزتك.'}catch(e){$('authStatus').textContent='تعذرت المزامنة الآن: '+friendlyError(e)+' — بياناتك ما زالت محفوظة على هذا الجهاز.'}finally{cloudWriteInProgress=false}},500)}
 function friendlyError(e){const c=e?.code||'';return ({'auth/invalid-email':'البريد الإلكتروني غير صحيح.','auth/missing-password':'أدخل كلمة المرور.','auth/weak-password':'اختر كلمة مرور من 6 أحرف على الأقل.','auth/email-already-in-use':'هذا البريد مسجل مسبقًا؛ جرّب تسجيل الدخول.','auth/invalid-credential':'البريد أو كلمة المرور غير صحيحين.','auth/user-not-found':'لا يوجد حساب بهذا البريد.','auth/too-many-requests':'محاولات كثيرة؛ حاول لاحقًا.','auth/network-request-failed':'تحقق من اتصال الإنترنت.','auth/operation-not-allowed':'فعّل تسجيل البريد وكلمة المرور في Firebase Authentication.','permission-denied':'تحقق من قواعد Firestore المنشورة.'})[c]||e?.message||'حدث خطأ غير معروف.'}
 $('save').onclick=()=>{const title=$('title').value.trim(),body=$('bodyText').value.trim();if(!title&&!body){$('title').focus();return}const old=data.find(x=>x.id===editing);const item={id:editing||Date.now().toString(36)+Math.random().toString(36).slice(2,7),title,body,due:$('dueDate').value||'',task:$('isTask').checked,done:old?.done||false,favorite:old?.favorite||false,updated:Date.now()};if(editing)data=data.map(x=>x.id===editing?item:x);else data.unshift(item);reset();queueCloudSave()};
 $('cancel').onclick=reset;$('search').oninput=render;document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{view=b.dataset.view;document.querySelectorAll('[data-view]').forEach(n=>n.classList.toggle('active',n===b));render()});
@@ -57,8 +57,28 @@ $('signupBtn').onclick=async()=>{try{await createUserWithEmailAndPassword(auth,$
 $('loginBtn').onclick=async()=>{try{await signInWithEmailAndPassword(auth,$('authEmail').value.trim(),$('authPassword').value)}catch(e){$('authStatus').textContent=friendlyError(e)}};
 $('resetBtn').onclick=async()=>{try{const email=$('authEmail').value.trim();if(!email){$('authStatus').textContent='اكتب بريدك الإلكتروني أولًا ثم اضغط «نسيت كلمة المرور؟».';return}await sendPasswordResetEmail(auth,email);$('authStatus').textContent='أرسلنا رابط إعادة تعيين كلمة المرور إذا كان البريد مسجلًا.'}catch(e){$('authStatus').textContent=friendlyError(e)}};
 $('logoutBtn').onclick=async()=>{try{await signOut(auth)}catch(e){$('authStatus').textContent=friendlyError(e)}};
-onAuthStateChanged(auth,async user=>{currentUser=user;$('logoutBtn').classList.toggle('hidden',!user);$('loginBtn').classList.toggle('hidden',!!user);$('signupBtn').classList.toggle('hidden',!!user);$('resetBtn').classList.toggle('hidden',!!user);$('authEmail').classList.toggle('hidden',!!user);$('authPassword').classList.toggle('hidden',!!user);if(!user){$('authStatus').textContent='أنت تستخدم مساحتي محليًا. سجّل الدخول لمزامنة بياناتك بين الأجهزة.';return}
-$('authStatus').textContent='جارٍ تحميل بيانات حسابك السحابية…';loadingCloud=true;
-try{const ref=doc(db,'users',user.uid),snap=await getDoc(ref);if(snap.exists()&&Array.isArray(snap.data().items)){data=snap.data().items;localStorage.setItem('masahati-items-v1',JSON.stringify(data));$('authStatus').textContent='تم تحميل بياناتك من السحابة بنجاح.'}else{await setDoc(ref,{items:data,updatedAt:Date.now()},{merge:true});$('authStatus').textContent='تم حفظ محتوى هذا الجهاز في حسابك السحابي.'}render()}catch(e){$('authStatus').textContent='تعذر تحميل البيانات السحابية: '+friendlyError(e)}finally{loadingCloud=false}});
+onAuthStateChanged(auth,async user=>{
+  if(unsubscribeCloud){unsubscribeCloud();unsubscribeCloud=null}
+  clearTimeout(saveTimer);localDirty=false;cloudWriteInProgress=false;currentUser=user;
+  $('logoutBtn').classList.toggle('hidden',!user);$('loginBtn').classList.toggle('hidden',!!user);$('signupBtn').classList.toggle('hidden',!!user);$('resetBtn').classList.toggle('hidden',!!user);$('authEmail').classList.toggle('hidden',!!user);$('authPassword').classList.toggle('hidden',!!user);
+  if(!user){$('authStatus').textContent='أنت تستخدم مساحتي محليًا. سجّل الدخول لمزامنة بياناتك بين الأجهزة.';return}
+  $('authStatus').textContent='جارٍ تحميل بيانات حسابك السحابية…';loadingCloud=true;
+  try{
+    const ref=doc(db,'users',user.uid),snap=await getDoc(ref);
+    if(snap.exists()&&Array.isArray(snap.data().items)){data=snap.data().items;localStorage.setItem('masahati-items-v1',JSON.stringify(data));$('authStatus').textContent='تم تحميل بياناتك من السحابة بنجاح.'}
+    else{await setDoc(ref,{items:data,updatedAt:Date.now()},{merge:true});$('authStatus').textContent='تم حفظ محتوى هذا الجهاز في حسابك السحابي.'}
+    render();
+    unsubscribeCloud=onSnapshot(ref,cloudSnap=>{
+      if(!cloudSnap.exists())return;
+      const cloudItems=cloudSnap.data().items;
+      if(!Array.isArray(cloudItems)||localDirty||cloudWriteInProgress||loadingCloud)return;
+      if(JSON.stringify(cloudItems)!==JSON.stringify(data)){
+        data=cloudItems;localStorage.setItem('masahati-items-v1',JSON.stringify(data));render();
+        $('authStatus').textContent='🔄 تم تحديث مساحتك تلقائيًا من جهاز آخر.';
+      }
+    },e=>{$('authStatus').textContent='توقفت المزامنة الفورية: '+friendlyError(e)});
+  }catch(e){$('authStatus').textContent='تعذر تحميل البيانات السحابية: '+friendlyError(e)}
+  finally{loadingCloud=false}
+});
 if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js').catch(()=>{}));render();
 </script></body></html>
