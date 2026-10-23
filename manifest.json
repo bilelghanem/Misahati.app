@@ -1,0 +1,16 @@
+{
+  "name": "مساحتي — مساحة عملك",
+  "short_name": "مساحتي",
+  "description": "مساحة عربية للملاحظات والأفكار والمهام",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f6f5fb",
+  "theme_color": "#6657d9",
+  "lang": "ar",
+  "dir": "rtl",
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
