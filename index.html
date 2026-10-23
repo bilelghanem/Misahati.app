@@ -61,7 +61,17 @@ onAuthStateChanged(auth,async user=>{
   if(unsubscribeCloud){unsubscribeCloud();unsubscribeCloud=null}
   clearTimeout(saveTimer);localDirty=false;cloudWriteInProgress=false;currentUser=user;
   $('logoutBtn').classList.toggle('hidden',!user);$('loginBtn').classList.toggle('hidden',!!user);$('signupBtn').classList.toggle('hidden',!!user);$('resetBtn').classList.toggle('hidden',!!user);$('authEmail').classList.toggle('hidden',!!user);$('authPassword').classList.toggle('hidden',!!user);
-  if(!user){$('authStatus').textContent='أنت تستخدم مساحتي محليًا. سجّل الدخول لمزامنة بياناتك بين الأجهزة.';return}
+  if(!user){
+    if(hadAuthenticatedSession){
+      data=[];localStorage.setItem('masahati-items-v1','[]');reset();render();
+      $('authStatus').textContent='تم تسجيل الخروج ومسح بيانات الحساب من هذا الجهاز. بياناتك محفوظة في السحابة ويمكنك استعادتها بتسجيل الدخول مجددًا.';
+      hadAuthenticatedSession=false;
+    }else{
+      $('authStatus').textContent='أنت تستخدم مساحتي محليًا. سجّل الدخول لمزامنة بياناتك بين الأجهزة.';
+    }
+    return
+  }
+  hadAuthenticatedSession=true;
   $('authStatus').textContent='جارٍ تحميل بيانات حسابك السحابية…';loadingCloud=true;
   try{
     const ref=doc(db,'users',user.uid),snap=await getDoc(ref);
